@@ -269,6 +269,7 @@
             color: #c48c58;
             line-height: 1;
             margin-bottom: 10px;
+            font-variant-numeric: oldstyle-nums; /* 完美保留 Cormorant 特色古典高低起伏字體 */
         }
 
         /* 下方的單位標籤 */
@@ -1113,7 +1114,7 @@
                     <input type="text" name="entry.759054616" class="form-control" placeholder="請輸入您的姓名" required>
                 </div>
 
-                <!-- 2. 聯絡電話 (對應 entry.1287498550) - 最新欄位 -->
+                <!-- 2. 聯絡電話 (對應 entry.1287498550) -->
                 <div class="form-group">
                     <label class="form-label">聯絡電話<span>PHONE NUMBER</span></label>
                     <input type="tel" name="entry.1287498550" class="form-control" placeholder="請輸入您的聯絡電話" required>
@@ -1155,6 +1156,14 @@
                         <option value="" disabled selected>請選擇飲食需求</option>
                         <option value="葷食">葷食</option>
                         <option value="素食">素食</option>
+                    </select>
+                </div>
+
+                <!-- 5-1. 素食數量 (對應 entry.1632032377) - 智能連動分流顯示 -->
+                <div class="form-group conditional-field" id="vegCountGroup">
+                    <label class="form-label">素食人數<span>VEGETARIAN COUNT</span></label>
+                    <select name="entry.1632032377" id="vegCountSelect" class="form-control">
+                        <option value="" disabled selected>請選擇素食人數</option>
                     </select>
                 </div>
                 
@@ -1227,12 +1236,20 @@
             isMusicPlaying = !isMusicPlaying;
         });
 
-        // 智能表單邏輯：根據參加人數判斷是否顯示飲食需求與兒童椅
+        // 智能表單邏輯控制
         function handleAttendeesChange(val) {
             const count = parseInt(val, 10);
             toggleConditionalFields(count);
         }
 
+        // 監聽飲食需求的選擇，用來判定是否顯示素食人數
+        const dietSelect = document.getElementById('dietSelect');
+        dietSelect.addEventListener('change', function() {
+            const count = parseInt(document.getElementById('attendeesCount').value, 10);
+            toggleVegCountField(count, this.value);
+        });
+
+        // 主連動判斷：控制主要隱藏欄位 (飲食、兒童椅)
         function toggleConditionalFields(count) {
             const dietGroup = document.getElementById('dietGroup');
             const chairGroup = document.getElementById('chairGroup');
@@ -1240,19 +1257,54 @@
             const chairSelect = document.getElementById('chairSelect');
 
             if (count > 0) {
-                // 顯示隱藏欄位並設為必填
                 dietGroup.style.display = 'block';
                 chairGroup.style.display = 'block';
                 dietSelect.setAttribute('required', 'required');
                 chairSelect.setAttribute('required', 'required');
+                
+                // 動態在人數改變時同步判斷素食數量欄位
+                toggleVegCountField(count, dietSelect.value);
             } else {
-                // 隱藏欄位並取消必填、重設數值
                 dietGroup.style.display = 'none';
                 chairGroup.style.display = 'none';
                 dietSelect.removeAttribute('required');
                 chairSelect.removeAttribute('required');
                 dietSelect.value = "";
                 chairSelect.value = "";
+                
+                // 隱藏素食人數欄位
+                toggleVegCountField(0, "");
+            }
+        }
+
+        // 智能子連動：控制「素食數量」是否在「人數大於 1 且勾選素食」時跳出
+        function toggleVegCountField(attendeesCount, dietValue) {
+            const vegCountGroup = document.getElementById('vegCountGroup');
+            const vegCountSelect = document.getElementById('vegCountSelect');
+
+            if (dietValue === '素食' && attendeesCount > 0) {
+                if (attendeesCount === 1) {
+                    // 若只有 1 人：自動帶入 1 並維持隱藏，不彈出額外選單干擾賓客
+                    vegCountGroup.style.display = 'none';
+                    vegCountSelect.removeAttribute('required');
+                    vegCountSelect.innerHTML = '<option value="1" selected>1 人</option>';
+                } else {
+                    // 若大於 1 人：【顯示】下拉選單，動態生成 1 到 總出席人數 的選項
+                    vegCountGroup.style.display = 'block';
+                    vegCountSelect.setAttribute('required', 'required');
+                    
+                    let optionsHtml = '<option value="" disabled selected>請選擇素食人數</option>';
+                    for (let i = 1; i <= attendeesCount; i++) {
+                        optionsHtml += `<option value="${i}">${i} 人</option>`;
+                    }
+                    vegCountSelect.innerHTML = optionsHtml;
+                }
+            } else {
+                // 若未選擇素食：重設並隱藏
+                vegCountGroup.style.display = 'none';
+                vegCountSelect.removeAttribute('required');
+                vegCountSelect.innerHTML = '<option value="" disabled selected>請選擇素食人數</option>';
+                vegCountSelect.value = "";
             }
         }
 
